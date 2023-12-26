@@ -1,13 +1,16 @@
-import { IAUploadPlugin, Upload } from "../../typings";
-
+import { IAUploadPlugin, IUpload } from "../../typings";
+import { AUpload } from '../index'
 export class AbstractPlugins implements IAUploadPlugin {
+  protected uploader:any
+  public type:'view'|'service' = 'view'
   constructor(){
     if( !this.pluginName ){
       throw new Error(`当前插件未定义名称，请配置：pluginName `)
     }
   }
-  setup(context: Upload) {
+  setup(context: IUpload ) {
     PluginManager.getInstance().register( this.pluginName, this )
+    this.uploader = context;
     //console.log(`${this.name} plugins is setup`)
   }
 
