@@ -1,0 +1,53 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "noImplicitAny": false,
+    "allowUmdGlobalAccess": true,
+    "module": "esnext",
+    "strict": true,
+    "jsx": "preserve",
+    "importHelpers": true,
+    "moduleResolution": "node",
+    "experimentalDecorators": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "removeComments": false,
+
+    "typeRoots": [
+      "./node_modules/@types/",
+      "./src/typings"
+    ],
+    "types": [
+      "webpack-env",
+      //"jest",
+      "resize-observer-browser"
+    ],
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    },
+    "lib": [
+      "esnext",
+      "dom",
+      "dom.iterable",
+      "scripthost"
+    ]
+  },
+  "include": [
+    "./src/**/*",
+    "examples/**/*.ts",
+    "examples/**/*.tsx",
+    "examples/**/*.vue",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "docs/.vuepress/**/*.ts",
+    "docs/.vuepress/**/*.vue",
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
