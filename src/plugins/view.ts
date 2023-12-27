@@ -70,7 +70,7 @@ export class PluginsView extends AbstractPlugins {
           const file = files[i]
           if( this.uploader ){
             this.uploader.upload([{
-              name:file.name,size:file.size, blobs:[file]
+              name:file.name,size:file.size, file:file
             }])
           }
         }

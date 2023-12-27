@@ -26,6 +26,38 @@ const instance = new AUpload()
 instance.attachView(AUpload.View)
 ```
 
+### 3. 修改服务的编码方式
+AUpload默认使用FormData进行包装
+示例如下：
+```
+const task = {name:'a.txt',size:1024, file:File },
+会编码为:
+------WebKitFormBoundary3AMiXnWD8WjBsiAx
+Content-Disposition: form-data; name="name"
+
+a.txt
+------WebKitFormBoundary3AMiXnWD8WjBsiAx
+Content-Disposition: form-data; name="size"
+
+1024
+------WebKitFormBoundary3AMiXnWD8WjBsiAx
+Content-Disposition: form-data; name="file"; filename="a.txt"
+Content-Type: application/octet-stream
+
+
+------WebKitFormBoundary3AMiXnWD8WjBsiAx--
+```
+
+如果要修改包装方式，您可以这么做
+```
+const instance = new AUpload();
+AUpload.Service.encode='json'
+```
+您会得到如下结果：
+```
+ {name:'a.txt',size:1024, file:'xfsef1' }
+```
+
 ### 3. 自定义文件处理器
 ```javascript
 const instance = new AUpload();

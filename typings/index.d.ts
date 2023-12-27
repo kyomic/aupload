@@ -80,7 +80,11 @@ type UploadTask = {
    */
   size?:number,
   /**
+   * 当此任务被切片时，此值有意义
+   */
+  chunkIndex?:number,
+  /**
    * 上传的文件流信息，支持File、字节流、Base64
    */
-  blobs:Array<File|ArrayBuffer|string>
+  file:File|ArrayBuffer|string
 }
