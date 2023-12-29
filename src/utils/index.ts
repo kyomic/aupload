@@ -11,9 +11,12 @@ export function generateRandomString(length) {
 }
 
 
+/**
+ * 一个简单的http请求选项
+ */
 export type AjaxOption = {
   url:string, 
-  method?:'GET'|'POST'|'PUT'|'DELETE',
+  method?:'GET'|'POST'|'PUT'|'DELETE'|'OPTION'|'HEAD'|'PATCH',
   async?:boolean,
   headers?:Record<string,any>
   timeout?:number,
@@ -38,7 +41,9 @@ export function ajax(opt: AjaxOption = { url: '', method: "GET", async: true, he
       for (let key in headers) {
         xhr.setRequestHeader(key, headers[key])
       }
-    } catch (err) { }
+    } catch (err) { 
+      console.warn(`set-headers`, err)
+    }
     if (timeout) {
       xhr.timeout = timeout
     }

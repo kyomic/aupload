@@ -1,9 +1,11 @@
+import Emitter from "@/core/emitter";
 import { IAUploadPlugin, IUpload } from "../../typings";
 import { AUpload } from '../index'
-export class AbstractPlugins implements IAUploadPlugin {
-  protected uploader:any
+export class AbstractPlugins extends Emitter implements IAUploadPlugin {
+  protected uploader:IUpload;
   public type:'view'|'service' = 'view'
   constructor(){
+    super()
     if( !this.pluginName ){
       throw new Error(`当前插件未定义名称，请配置：pluginName `)
     }
@@ -20,6 +22,10 @@ export class AbstractPlugins implements IAUploadPlugin {
       return ctor.pluginName;
     }
     return '';
+  }
+
+  destroy(){
+    PluginManager.getInstance().unregister( this.pluginName, this );
   }
 }
 
@@ -38,6 +44,18 @@ export class PluginManager{
       throw new Error(` 插件：${name} 已经存在，请换个名称 `)
     }
     cache[name] = plugins;
+  }
+
+  /**
+   * 取消插件的注册
+   * @param name 
+   * @param plugins 
+   */
+  unregister( name:string, plugins:IAUploadPlugin ){
+    const cache = PluginManager.cache;
+    try{
+      delete cache[name];
+    }catch(err){}
   }
 
   /**

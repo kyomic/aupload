@@ -12,7 +12,10 @@ export default Vue.extend({
   name: 'App',
   components: {},
   mounted(){
-    new AUpload()
+    if( window['instance']){
+      window['instance'].destroy();
+    }
+    window['instance']= new AUpload();
     console.log('Auplad',AUpload)
   }
 })

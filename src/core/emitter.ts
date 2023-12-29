@@ -2,7 +2,6 @@ import { IEventDispatcher } from "../../typings"
 class Emitter implements IEventDispatcher {
   protected _events = {}
   protected _once_events = {}
-
   constructor() {}
 
   /**
