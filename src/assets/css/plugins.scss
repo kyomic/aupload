@@ -1,0 +1,231 @@
+.aupload_info{
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  height: 0;
+  .message{}
+  .message + .message{
+    margin-top: 10px;
+  }
+  .message-box{
+    min-height: 20px;
+    background: #ffffff;
+    padding: 6px 12px;
+    border: 1px solid #efefef;
+    border-radius: 6px;
+    line-height: 20px;
+    display: inline-block;
+    box-sizing: content-box;
+    font-size: 12px;
+    box-shadow: 0 0 20px 4px #edededd9;
+  }
+  i.close{
+    font-style: normal;
+    margin-left: 10px;
+    color: var(--color-primary);
+    cursor: pointer;
+    &:hover{
+      color:var(--color-primary-hover);
+    }
+  }
+  i em{
+    color: #ccc;
+    font-style: normal;
+  }
+
+  .message-error{
+    border-color: var(--color-error-1);
+    color: var(--color-error);;
+  }
+  .message-warn{
+    border-color: var(--color-warn-1);
+    color: var(--color-warn);
+  }
+}
+
+
+
+.aupload_view{
+  position: relative;
+  .dropper{
+    
+    min-height: 20px;
+    position: absolute;
+    
+  }
+  .task{
+    margin-top: 10px;
+    button{
+      height: 24px;
+    }
+    .file{
+      border: 1px solid #f0f0f0;
+      padding: 5px 10px;
+      border-radius: 5px;
+      .size{
+        color: #ccc;
+        font-size: 14px;
+        width: 115px;
+        text-align: right;
+      }
+    }
+    .file + .file{
+      margin-top: 10px;
+    }
+    .info, .ext{ 
+      padding-top: 5px;
+      padding-bottom: 5px;
+    }
+    .info{
+      display: flex;
+      justify-content: space-between;
+      .name{
+        i{
+          font-size: 9px;
+          border: 1px solid #666;
+          font-style: normal;
+          padding-top: 10px;
+          /* padding: 3px 2px; */
+          padding-top: 7px;
+          position: relative;
+          /* transform: scale(0.8,0.8); */
+          width: 20px;
+          height: 22px;
+          display: inline-block;
+          /* display: flex; */
+          text-align: center;
+          margin-right: 10px;
+          border-radius:3px;
+        }
+        i:after {
+          content: " ";
+          width: 0;
+          height: 0;
+          position: absolute;
+          right: -1px;
+          top: -1px;
+          border-top: 7px solid white;
+          border-left: 7px solid #494949;
+        }
+        em{
+          display: inline-block;
+          transform: scale(0.8);
+          font-style: normal;
+        }
+      }
+    }
+    .ext{
+      display: flex;
+      .progress{
+        height: 24px;
+        /* background-color: red; */
+        background: #f1f1f1;
+        position: relative;
+        border-radius: 24px;
+        box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        flex: 1 0 auto;
+        .bar{
+          height: 100%;
+          position: absolute;
+          background: var(--color-primary);
+          border-radius: 24px;
+        }
+
+        .text{
+          color: white;
+          font-size: 12px;
+          line-height: 24px;
+          position: absolute;
+          margin-left: 10px;
+          text-shadow: 1px 0px #3b7185;
+          min-width: 100px;
+        }
+        .text .p{
+          display: inline-block;
+          min-width: 37px;
+        }
+        .text i{
+          font-style: normal;
+        }
+        
+      }
+      .progress_error{
+        .bar{
+          background: #ff0037;
+        }
+      }
+      .opt{
+        margin-left: 10px;
+      }
+      
+    }
+  }
+  .masker{
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    opacity: 0.1;
+    background: #000000;
+    top: 0;
+    display: none;
+  }
+  .holder{
+    width: 100%;
+    height: 150px;
+  }
+
+  .view{
+    border:1px dashed var(--color-primary-3);
+    background: var(--color-primary-5);
+    border-radius: 6px;
+    &:hover{
+      background: var(--color-primary-4);
+      border-color: var(--color-primary-2);
+    }
+  }
+  .view-in{
+    background: var(--color-primary-4);
+    border-color: var(--color-primary-2);
+  }
+  /** 文件浏览 **/
+  .view{
+    .info{
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      left: 50%;
+      top: 0;
+      width: calc( 100vw * 0.8 );
+      margin-left: calc( -100vw * 0.4 );
+      margin-top: 20px;
+      .button-primary{
+        width:150px;
+        overflow: hidden;
+        position: relative;
+        input[type=file]{
+          cursor: pointer;
+          border: none;
+          outline: none;
+          padding: 10px;
+          padding-top: 100px;
+          position: absolute;
+          left: 0;
+          top: 0;
+          color: transparent;
+          text-shadow: 0 0 0 #000;
+        }
+      }
+      p{
+        color: #666;
+        pointer-events: none;
+      }
+    }
+  }
+  
+}

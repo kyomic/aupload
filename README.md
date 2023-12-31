@@ -19,6 +19,23 @@ btn.addEventListener('click', ()=>{
 })
 ```
 
+### 2. 文件大小限制
+
+```javascript
+const instance = new AUpload()
+instance.middleware.onAppendFile((task)=>{
+	const file = task.file;
+	const extensions =['.mp3,.mp4'];
+	const ext = file.name.substring(file.name.lastIndexOf('.'))
+	if( !extensions.include(ext) ){
+		throw new ERROR(`不支持的文件类型，请选择:`, extensions.join(''))
+	}
+})
+btn.addEventListener('click', ()=>{
+	instance.select();
+})
+```
+
 ### 2. 系统内置界面
 
 ```javascript

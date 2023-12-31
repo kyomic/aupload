@@ -60,5 +60,6 @@ module.exports = {
     // while(true) 都不允许写么
     'no-constant-condition': ['error', { checkLoops: false }],
     'prefer-spread': 'off',
+    'no-dupe-else-if':'off'
   },
 }

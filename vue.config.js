@@ -5,6 +5,8 @@ console.log("root config is load")
 let config = defineConfig({
   transpileDependencies: true,
   productionSourceMap: false,
+  publicPath:'./',
+  assetsDir: './examples/vue/public/static/',
   pages: {
     index: {
       // 修改入口

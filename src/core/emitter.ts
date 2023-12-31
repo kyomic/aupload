@@ -12,6 +12,9 @@ class Emitter implements IEventDispatcher {
     const events = this._events[type] || []
     let context = this
     let arg = args ||[]
+    arg.unshift({
+      type,target:this
+    })
     events.map(({ func, args }, index) => {
       try {
         func.apply(context, arg.concat(args || []))

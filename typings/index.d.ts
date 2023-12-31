@@ -1,3 +1,6 @@
+import Emitter from "@/core/emitter"
+import { AjaxOption } from "@/utils"
+
 export interface IEventDispatcher {
   dispatch:(type: string, ...args:any[])=>void
   /**
@@ -35,6 +38,20 @@ declare class MyExportedClass{
 }
 
 
+interface IUploadMiddleware{
+  /**
+   * 开始进行文件传输前回调
+   * @param {Middleware} middleware - 中间件实例
+   * @returns 
+   */
+  onAppendFile:( middleware: ( task:UploadTask, context?:IUpload)=> Promise<any> )=>void
+  get(name:string):Array<Middleware>
+}
+
+export type Middleware = (task: UploadTask, context: IUpload)=>Promise<any>
+
+
+
 type AUploadOption = {
   /**
    * 接受文件数据的服务
@@ -54,11 +71,23 @@ type AUploadOption = {
    * 是否启动worker
    */
   worker?:boolean
+  /**
+   * 是否开启多选，默认为true
+   */
+  multiple?:boolean
 
   /**
    * 当您需要支持分片、续传时，配置的最小分块大小，默诵为-1，即不分片
    */
   chunkSize?:number
+  /**
+   * 允许的文件大小，单位字节，默认为:-1，无限制
+   */
+  allowedFileSize?:number
+  /** 
+   * 允许的文件类型，
+   */
+  allowedMimeType?:Array<string>
   /**
    * 生成文件的唯一ID，用于前后端文件校验，实现秒传效果(默认为文件前1MB以内的 64位 SHA-256 串 )
    * @returns 
@@ -79,10 +108,12 @@ type AUploadOption = {
 type UploadX = {
   container:Element
 }
-interface IUpload{
+interface IUpload extends Emitter{
   container:Element
   append( task:UploadTask )
   async upload:( tasks?: Array<UploadTask> )=>void;
+
+  middleware:IUploadMiddleware,
   /**
    * 返回上传配置
    */
@@ -144,6 +175,10 @@ type UploadTask = {
    */
   file:File|ArrayBuffer|string,
   /**
+   * 是不支持多选
+   */
+  multiple?:boolean
+  /**
    * 文件hash
    */
   hash?:string,
@@ -151,4 +186,5 @@ type UploadTask = {
    * 每个任务可以拥有不同的url，encoding编码方式
    */
   config?:Record<{url?:string, encoding?:string}>
+  progress?:{ loaded:number, total:number, duration:number, start?:number}
 }
