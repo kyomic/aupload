@@ -1,14 +1,12 @@
-import { AUploadOption, IUpload, UploadTask } from "typings";
+import { AUploadOption, IAUploadServicePlugin, IUpload, UploadTask } from "typings";
 import { AbstractPlugins } from ".";
 import { AjaxOption, ajax } from "@/utils";
 import { JSWorker } from "@/utils/worker";
 import { FileEncoder } from "@/utils/encoder";
 import AUpload from "..";
 import { AUploadEvent } from "@/core/event";
-import { getFileType } from "@/utils/mime";
 
-
-export class PluginsAutoService extends AbstractPlugins {
+export class PluginsAutoService extends AbstractPlugins implements IAUploadServicePlugin {
   static pluginName = 'autoservice'
   /**
    * 编码方式
@@ -16,7 +14,7 @@ export class PluginsAutoService extends AbstractPlugins {
    * binrary: 直接将文件流发送至服务器，相关的参数会通过query传输
    * base64: 将文件编码为base64，参数打包为JSON，效率较低，不建议使用
    */
-  static encoding: 'file' | 'binary' | 'base64' = 'binary'
+  static encoding: 'file' | 'binary' | 'base64' = 'file'
   static url: string = ''
 
   /**
@@ -25,11 +23,21 @@ export class PluginsAutoService extends AbstractPlugins {
   private _worker: JSWorker = new JSWorker()
   private _evtWorker
   private _isWorkerInitialized: boolean = false;
-  private _hashs: Record<string, string> = {}
   /**
    * 当前文件列表
    */
   private _files: Record<string, { task: UploadTask, continuous: UploadTask, chunks: Array<UploadTask> }> = {}
+
+  /**
+   * 所有切片任务
+   */
+  private _chunks: Array<UploadTask> = []
+  /**
+   * 每个chunk对应的xhr缓存，用于获取请求实例，方便取消请求
+   * xhr: 一般为xmlhttp实例
+   * config，为请求配置
+   */
+  private _chunksXHR:Record<string,{hash:string,chunk_index:number,xhr:any, config:AjaxOption}> = {}
   constructor() {
     super()
     this.type = 'service'
@@ -76,7 +84,7 @@ export class PluginsAutoService extends AbstractPlugins {
             chunk_count: chunksLength,
             //file: await encoder.blob2File(blob, file.name),
             file: blob,
-            hash:task.hash
+            hash: task.hash
           })
         }
       } else if (file instanceof ArrayBuffer) {
@@ -119,47 +127,86 @@ export class PluginsAutoService extends AbstractPlugins {
     return url;
   }
 
- 
 
+  async pause(task: UploadTask) {
+    //debugger
+  }
+  async resume(task: UploadTask) {
+    //debugger
+  }
+  async remove(task: UploadTask) {
+    //debugger
+  }
+
+  /**
+   * AUpload 调用Service层，添加上传任务
+   * @param tasks 
+   */
   async exec(tasks: Array<UploadTask>) {
     const option = this.uploader.option;
-    // 上传地址
-    let url = PluginsAutoService.url || option.url || ''
     let chunkTasks: Array<UploadTask> = []
     for (let task of tasks) {
-      let hash = task.hash??'';
+      let hash = task.hash ?? '';
       let file = task.file as File;
       let currentChunkTasks: Array<UploadTask> = []
       // 处理续传
       const start = option.start;
       let continuousTask: UploadTask | null = null;
       if (start) {
-        continuousTask = await start(task.file as File, this.uploader) as UploadTask
+        // 计算开始位置 
+        if (task.progress && task.progress.chunks) {
+          // 在localStorage中找到起始位置
+          let chunk_index = task.progress.chunks.findIndex(item => item == 0)
+          if (chunk_index == -1) {
+            chunk_index = task.progress.chunks.length
+          }
+          continuousTask = { chunk_index, chunk_count: task.progress.chunks.length, name: task.name, file: task.file }
+        } else {
+          // 通过服务端响应起始位置 
+          continuousTask = await start(task.file as File, this.uploader) as UploadTask
+        }
         if (continuousTask && continuousTask.chunk_index) {
-          if (task.file instanceof File) {
-            if (continuousTask.chunk_index * (option.chunkSize ?? 0) > task.file.size) {
-              // 不可用的续传数据
-              console.warn(`不正确的续传点:chunk_index:${continuousTask?.chunk_index},byte_offset=${continuousTask.chunk_index * (option.chunkSize ?? 0)}`)
-              continuousTask = null;
+          if (continuousTask.chunk_count && continuousTask.chunk_count <= continuousTask.chunk_index) {
+            
+            console.warn(`好像传完了`, this._files)
+            if (!this._files[hash]) {
+              this._files[hash] = {
+                task, continuous: continuousTask as UploadTask, chunks: currentChunkTasks
+              }
+              this.uploader.dispatch(new AUploadEvent(AUploadEvent.APPEND, { task }))
+            } else {
+              throw new Error(`存在同样的文件：${file.name}`)
+            }
+            this.getFileProgress( task );
+            this.uploader.dispatch( new AUploadEvent(AUploadEvent.COMPLETE,{task}))
+            continue;
+          } else {
+            if (task.file instanceof File) {
+              if (continuousTask.chunk_index * (option.chunkSize ?? 0) > task.file.size) {
+                // 不可用的续传数据
+                console.warn(`不正确的续传点:chunk_index:${continuousTask?.chunk_index},byte_offset=${continuousTask.chunk_index * (option.chunkSize ?? 0)}`)
+                continuousTask = null;
+              }
             }
           }
         }
       }
       try {
         currentChunkTasks = chunkTasks.concat(await this.splitChunk(task, continuousTask))
-        if( !this._files[hash]){
+        if (!this._files[hash]) {
           this._files[hash] = {
             task, continuous: continuousTask as UploadTask, chunks: currentChunkTasks
           }
-        }else{
+          this.uploader.dispatch(new AUploadEvent(AUploadEvent.APPEND, { task }))
+        } else {
           throw new Error(`存在同样的文件：${file.name}`)
         }
+
       } catch (err) {
         console.error(err)
+        this.uploader.dispatch(new AUploadEvent(AUploadEvent.ERROR, { task, error: err }))
         continue
       }
-
-
       chunkTasks = chunkTasks.concat(currentChunkTasks)
     }
     //throw new Error('test')
@@ -172,8 +219,145 @@ export class PluginsAutoService extends AbstractPlugins {
       }
       return item;
     })
+    this._chunks = this._chunks.concat(chunkTasks);
     console.log('文件集：', this._files)
     console.log(`找到任务：${chunkTasks.length} chunks`, chunkTasks)
+    this.resumeTask();
+
+  }
+
+  /**
+   * http的形式上传切片
+   * @param chunk 
+   */
+  private async uploadChunk(chunk: UploadTask) {
+    const option = this.uploader.option
+    let url = PluginsAutoService.url || option.url || ''
+    let file = chunk.file;
+    let payload;
+    let headers = {}
+    if (chunk.config) {
+      if (chunk.config.url) {
+        url = chunk.config.url;
+      }
+      if (chunk.config.headers) {
+        headers = { ...headers, ...chunk.config.headers }
+      }
+    }
+    console.log(`文件块:`, file)
+    //TODO
+    const encoding: string = PluginsAutoService.encoding as string;
+    switch (encoding) {
+      case 'binary':
+        payload = file.slice(0, chunk.size);
+        break;
+      default:
+        const form = new FormData();
+        if (file instanceof File) {
+          // 未配置文件大小时，大小由File对象获取
+          chunk.size = file.size;
+        }
+        for (let i in chunk) {
+          if (i != 'config') {
+            form.append(i, chunk[i])
+          }
+        }
+        payload = form;
+        break
+    }
+
+    let config = {
+      url,
+      method: "POST" as any,
+      headers,
+      payload: payload,
+      onUploadStart: (event) => {
+        if (!chunk.progress) {
+          chunk.progress = { state:3, total: 0, loaded: 0, duration: 0, start_timestamp: new Date().valueOf() }
+        }
+        this.onTaskEvent({ type: 'uploadstart' }, chunk)
+      },
+      onUploadProgress: (event) => {
+        const { loaded, total } = event;
+        if (chunk.progress) {
+          const progress = chunk.progress
+          progress.total = total;
+          progress.loaded = loaded
+          if (progress.start_timestamp) {
+            progress.duration = new Date().valueOf() - progress.start_timestamp;
+          } else {
+            progress.duration = 0
+          }
+          console.log('stats=====',chunk.progress)
+          // if( loaded >= total ){
+          //   progress.state = 1
+          // }
+          chunk.progress = progress;
+          this.onTaskEvent({ type: 'uploadprogress' }, chunk)
+        }
+      }
+    }
+    await new Promise(async (resolve, reject) => {
+      const callback = ajax(config)
+      let data
+      try {
+        if (callback instanceof Promise) {
+          data = await callback
+        } else {
+          data = callback
+        }
+      } catch (err) {
+        console.error(err)
+      }
+      const xhr_id = [chunk.hash, chunk.chunk_index].join('_')
+      this._chunksXHR[xhr_id] = {
+        hash:chunk.hash??'',
+        chunk_index:chunk.chunk_index??0,
+        xhr: data? data.xhr :null,
+        config
+      }
+      //resolve(true)
+      let error_test = false;
+      error_test = Math.random() > 0.5
+      if (chunk?.chunk_index && chunk.chunk_index > 2 && error_test) {
+        if( chunk.progress ){
+          chunk.progress.loaded =0
+          chunk.progress.state =0
+        }
+        this.updateTaskState( chunk.hash??'', 0)
+        console.error('chunk error')
+        console.log('chunks',this._chunks)
+        this.onTaskEvent({
+          type: 'chunk_error'
+        }, chunk)
+
+        this.onTaskEvent({ type: 'uploadprogress' }, chunk)
+        reject('网络错误。 debug')
+      } else {
+        resolve(true)
+      }
+    })
+  }
+
+  /**
+   * 更新任务的状态
+   * @param hash 
+   * @param state 
+   */
+  private updateTaskState( hash:string, state:number ){
+    const files = this._files[hash];
+    if( files ){
+      const task = files.task;
+      if( task && task.progress ){
+        task.progress.state = state;
+      }
+    }
+  }
+
+  private async resumeTask() {
+    const option = this.uploader.option
+    const chunkTasks = this._chunks;
+    let url = PluginsAutoService.url || option.url || ''
     if (option.worker) {
       if (!this._isWorkerInitialized) {
         const code = `
@@ -223,91 +407,11 @@ export class PluginsAutoService extends AbstractPlugins {
     } else {
       // For 循环执行
       for (let i = 0; i < chunkTasks.length; i++) {
-        let chunk = chunkTasks[i];
-        let file = chunk.file;
-        let payload;
-        let headers = {}
-        if (chunk.config) {
-          if (chunk.config.url) {
-            url = chunk.config.url;
-          }
-          if (chunk.config.headers) {
-            headers = { ...headers, ...chunk.config.headers }
-          }
-        }
-        console.log(`文件块:`, file)
-        //TODO
-        const encoding: string = PluginsAutoService.encoding as string;
-        switch (encoding) {
-          case 'binary':
-            payload = file.slice(0, chunk.size);
-            break;
-          default:
-            const form = new FormData();
-            if (file instanceof File) {
-              // 未配置文件大小时，大小由File对象获取
-              chunk.size = file.size;
-            }
-            for (let i in chunk) {
-              form.append(i, chunk[i])
-            }
-            payload = form;
-            break
-        }
-        let config = {
-          url,
-          method: "POST" as any,
-          headers,
-          payload: payload,
-          onUploadStart: (event) => {
-            chunk.progress = { total: 0, loaded: 0, duration: 0, start: new Date().valueOf() }
-            this.onTaskEvent({ type: 'uploadstart' }, chunk)
-          },
-          onUploadProgress: (event) => {
-            const { loaded, total } = event;
-            const progress = chunk.progress || { total: 0, loaded: 0, duration: 0 };
-            progress.total = total;
-            progress.loaded = loaded
-            if (progress.start) {
-              progress.duration = new Date().valueOf() - progress.start;
-            } else {
-              progress.duration = 0
-            }
-            console.log('event--progress:', loaded, total)
-            chunk.progress = progress;
-            this.onTaskEvent({ type: 'uploadprogress' }, chunk)
-          }
-        }
-        await new Promise(async (resolve, reject) => {
-          const callback = ajax(config)
-          let data
-          try {
-            if (callback instanceof Promise) {
-              data = await callback
-            } else {
-              data = callback
-            }
-          } catch (err) { }
-          //resolve(true)
-          let error_test = false;
-          if (chunk.name.indexOf('百度开发者工具-') != -1) {
-            error_test = true;
-
-          }
-          if (chunk?.chunk_index && chunk.chunk_index > 20 && error_test) {
-            this.onTaskEvent({
-              type: 'chunk_error'
-            }, chunk)
-            reject('error')
-          } else {
-            resolve(true)
-          }
-
-        })
-
+        try{
+          await this.uploadChunk( chunkTasks[i])
+        }catch(err){}
       }
     }
-
   }
 
   /**
@@ -315,38 +419,72 @@ export class PluginsAutoService extends AbstractPlugins {
    * @param file 
    * @returns 
    */
-  private getFileProgress(file: UploadTask) {
-    let progress = file.progress || { total: 0, loaded: 0, duration: 0, start: 0 }
+  private getFileProgress(file: UploadTask, chunk?: UploadTask) {
+    let progress = file.progress || { state:0, total: 0, loaded: 0, duration: 0, start_timestamp: 0, chunks: [] }
     let loaded = 0;
     let duration = 0
     if (file.hash) {
       const current = this._files[file.hash ?? 'unkonw']
       if (current) {
+        let continuousIndex = -1
         if (current.continuous) {
           // 补上续传数据
-          const index = current.continuous.chunk_index ?? 0
+          continuousIndex = current.continuous.chunk_index ?? 0
+          if (continuousIndex < 0) continuousIndex = 0
           if (this.uploader) {
-            loaded += index * (this.uploader.option?.chunkSize ?? 0)
+            console.log('续传续传.......###########', continuousIndex)
+            loaded += continuousIndex * (this.uploader.option?.chunkSize ?? 0)
           }
         }
-        if (!progress.start) {
-          progress.start = new Date().valueOf()
+        // 更新chunk status
+        if (chunk) {
+          const isChunkLoaded = chunk.progress && chunk.progress.loaded >= chunk.progress.total;
+          if (isChunkLoaded) {
+            if (!progress.chunks || progress.chunks.length != chunk.chunk_count) {
+              progress.chunks = Array.from({ length: chunk.chunk_count ?? 1 }).map((item, idx) => {
+                if (continuousIndex >= -1 && continuousIndex >= idx) {
+                  return -1
+                }
+                return 0;
+              })
+            }
+            progress.chunks[chunk.chunk_index ?? 0] = 1;
+          }
+        }
+        if (!progress.start_timestamp) {
+          progress.start_timestamp = new Date().valueOf()
         }
         const reference: File = current.task.file as File;
+        let loads:any = []
         current.chunks.forEach(item => {
           duration += Number(item.progress?.duration ?? 0)
           loaded += Number(item.progress?.loaded ?? 0)
+          loads.push(item.progress?.loaded ?? 0)
         })
-        progress.duration = new Date().valueOf() - (progress?.start ?? 0)
+        
+        if( !current.chunks.length ){
+          // TODO
+          // 不存在切片.
+
+        }
+        console.log('~~~~ loads',loads, current)
+        progress.duration = new Date().valueOf() - (progress?.start_timestamp ?? 0)
         if (progress.duration <= 0) {
           progress.duration = duration
         }
         progress.loaded = loaded
+
         if (reference) { progress.total = reference.size }
+        /**
+         * 因为payload多传了一堆非流的参数，loaded有可能大于total
+         */
+        if (progress.loaded >= progress.total) {
+          progress.loaded = progress.total;
+        }
+        if( progress.loaded>= progress.total) progress.state = 1
         file.progress = progress
       }
     }
-    console.log('progress', progress)
     return progress
   }
 
@@ -360,15 +498,14 @@ export class PluginsAutoService extends AbstractPlugins {
           case 'uploadstart':
             break;
           case 'uploadprogress':
-            task.progress = this.getFileProgress(task)
-            this.uploader.dispatch(AUploadEvent.PROGRESS, task)
+            task.progress = this.getFileProgress(task, chunk)
+            this.uploader.dispatch(new AUploadEvent(AUploadEvent.PROGRESS, { task, chunk }))
             break;
           case 'chunk_error':
-            this.uploader.dispatch(AUploadEvent.CHUNK_ERROR, task, chunk)
+            this.uploader.dispatch(new AUploadEvent(AUploadEvent.CHUNK_ERROR, { task, chunk }))
             break
         }
       }
-
     }
 
   }

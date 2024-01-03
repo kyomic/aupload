@@ -13,11 +13,21 @@ export default class FileItem extends Emitter{
     super()
     this._root.className = 'file'
     this.attachTask( task )
+    this._root.addEventListener('click', this.onClick.bind(this) )
   }
 
   attachTask( task:UploadTask ){
     this._task = task;
     this.draw();
+  }
+  private onClick(e:MouseEvent){
+    let target:any = e.target;
+    if( target.tagName.toLowerCase() =='button'){
+      const cls = target.className;
+      if( cls ){
+        this.dispatch(cls, this._task )
+      }
+    }
   }
   private draw(){
     const tpl = `
@@ -32,8 +42,11 @@ export default class FileItem extends Emitter{
             <span class='text'><i class='p'>{{percent}}%</i><i> {{speed}}/S</i></span>
           </div>
           <div class='opt'>
-            <button>重试</button>
-            <button disabled>重试</button>
+            <button class='resume'>继续</button>
+            <button class='pause'>暂停</button>
+            <button class='retry'>重试</button>
+            <button class='retry' disabled>重试</button>
+            <button class='remove'>移除</button>
           </div>
         </div>
       </div>
@@ -57,6 +70,7 @@ export default class FileItem extends Emitter{
     }
     let html = ArtTemplate.compile(tpl)( data )
     this._root.innerHTML = html;
+
   }
 
 
@@ -76,5 +90,13 @@ export default class FileItem extends Emitter{
   }
   get root(){
     return this._root;
+  }
+
+  destroy(){
+    if( this._root ){
+      try{
+        this._root.parentNode?.removeChild( this._root );
+      }catch(err){}
+    }
   }
 }

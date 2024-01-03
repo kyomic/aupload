@@ -1,33 +1,47 @@
 import { IEventDispatcher } from "../../typings"
+
+type TypedEvent = {
+  type: string,
+  [attr: string]: any
+}
 class Emitter implements IEventDispatcher {
   protected _events = {}
   protected _once_events = {}
-  constructor() {}
+  constructor() { }
 
   /**
    * 触发事件
    * @param {string} type - 事件类型
    */
-  dispatch(type: string, ...args:any[]) {
-    const events = this._events[type] || []
+  dispatch(type: string | TypedEvent, ...args: any[]) {
+    const evtType = typeof type == 'object' ? type.type : type
+    let evt: any
+    if (typeof type == 'object') {
+      evt = type
+    } else {
+      evt = { type:evtType }
+    }
+    evt.target = this;
+
+    const events = this._events[evtType] || []
     let context = this
-    let arg = args ||[]
-    arg.unshift({
-      type,target:this
-    })
+    let arg = args || []
+    arg.unshift(evt)
     events.map(({ func, args }, index) => {
       try {
         func.apply(context, arg.concat(args || []))
-      } catch (err) {}
+      } catch (err) { 
+        console.error('dispatch',err)
+      }
     })
     //once
-    const once_events = this._once_events[type] || []
+    const once_events = this._once_events[evtType] || []
     once_events.map(({ func, args }, index) => {
       try {
         func.apply(context, arg.concat(args || []))
-      } catch (err) {}
+      } catch (err) { }
     })
-    this._once_events[type] = []
+    this._once_events[evtType] = []
   }
   /**
    * 添加一个事件

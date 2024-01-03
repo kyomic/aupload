@@ -69,5 +69,109 @@ export default class Storage {
     }
   }
 }
+
+export class IndexDBStore {
+  /**
+   * 数据库名称
+   */
+  static DATABASE: string = 'aupload'
+  /**
+   * 表名
+   */
+  static TABLE: string = 'blob'
+  private _database: any;
+  constructor() {
+    this.ready()
+  }
+  ready() {
+    return new Promise((resolve, reject) => {
+      if (this._database) {
+        resolve(this);
+      } else {
+        const request = window.indexedDB.open(IndexDBStore.DATABASE, 1);
+        request.onsuccess = (event: any) => {
+          this._database = event.target?.result;
+          resolve(this);
+        };
+        request.onupgradeneeded = (event: any) => {
+          const db = event.target?.result;
+          if (!db.objectStoreNames.contains(IndexDBStore.TABLE)) {
+            db.createObjectStore(IndexDBStore.TABLE);
+          }
+        };
+        request.onerror = (event) => {
+          reject(event);
+        }
+      }
+    })
+  }
+  onReady(request, callback) {
+    return new Promise((resolve, reject) => {
+      const success = value => {
+        callback && callback(false, value)
+        resolve(value);
+      }
+      const error = event => {
+        callback && callback(event);
+        reject(event);
+      }
+      return this.ready().then(() => {
+        request(success, error);
+      }).catch(error)
+    })
+  }
+  setItem(key, value, callback) {
+    return this.onReady((success, error) => {
+      const request = this._database.transaction(IndexDBStore.TABLE, 'readwrite').objectStore(IndexDBStore.TABLE).put(value, key);
+      request.onsuccess = () => {
+        success(value);
+        callback && callback(false, value)
+      };
+      request.onerror = error
+    }, callback)
+  }
+  getItem(key, callback) {
+    return this.onReady((success, error) => {
+      const request = this._database.transaction(IndexDBStore.TABLE).objectStore(IndexDBStore.TABLE).get(key);
+      request.onsuccess = () => success(request.result);
+      request.onerror = error;
+    }, callback)
+  }
+  removeItem(key, callback) {
+    return this.onReady((success, error) => {
+      const request = this._database.transaction(IndexDBStore.TABLE, 'readwrite').objectStore(IndexDBStore.TABLE).delete(key);
+      request.onsuccess = () => {
+        success(key);
+      };
+      request.onerror = error;
+    }, callback)
+  }
+
+  key(index, callback) {
+    return this.onReady((success, error) => {
+      const request = this._database.transaction(IndexDBStore.TABLE).objectStore(IndexDBStore.TABLE).getAllKeys();
+      request.onsuccess = () => success(request.result[index]);
+      request.onerror = error;
+    }, callback)
+  }
+
+  keys(callback) {
+    return this.onReady((success, error) => {
+      const request = this._database.transaction(IndexDBStore.TABLE).objectStore(IndexDBStore.TABLE).getAllKeys();
+      request.onsuccess = () => success(request.result);
+      request.onerror = error;
+    }, callback)
+  }
+  clear(callback) {
+    return this.onReady((success, error) => {
+      const request = this._database.transaction(IndexDBStore.TABLE, 'readwrite').objectStore(IndexDBStore.TABLE).clear();
+      request.onsuccess = () => {
+        success(null);
+      };;
+      request.onerror = error;
+    }, callback)
+  }
+}
+export const indexDbStore = new IndexDBStore();
 export const localStore = new Storage('localStorage')
 export const sessionStore = new Storage('sessionStorage')

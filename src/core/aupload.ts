@@ -1,5 +1,5 @@
 
-import { AUploadOption, IAUploadPlugin, IUpload, IndexableAUpload, UploadTask } from '../../typings';
+import { AUploadOption, IAUploadPlugin, IAUploadServicePlugin, IUpload, IndexableAUpload, UploadTask } from '../../typings';
 import Emitter from './emitter'
 import { PluginsView } from '../plugins/view';
 import { PluginManager } from '../plugins';
@@ -12,23 +12,19 @@ import { PluginsMessage } from '@/plugins/message';
 import { PluginsStorage } from '@/plugins/storage';
 import { AUploadEvent } from './event';
 
-
-class UploadQueue extends Emitter {
-
-}
-
 class Upload extends Emitter implements IUpload {
   static defaultConfig: AUploadOption = {
-    url: 'http://localhost:8080',
+    url: 'http://localhost:8081/upload',
     root: 'body',
     config: {
-      headers: { 'a': 1 },
+      headers: {},
       data: { 'a': 2 }
     },
     //allowedMimeType:['image/*'],
     multiple: true,
     chunkSize: 1024 * 1024,
     worker: false,
+    cachedFileSize:400*1024*1024,
     start: (file: File, context: IUpload) => {
       //return Promise.resolve(null);
 
@@ -57,7 +53,9 @@ class Upload extends Emitter implements IUpload {
             hash = await fileId(file)
           }
         } catch (err) {
-          throw new Error(`AUploadOption.fileId 执行出错：` + err)
+          const error = `AUploadOption.fileId 执行出错：` + err
+          context.dispatch( new AUploadEvent( AUploadEvent.ERROR, {error}))
+          //throw new Error(`AUploadOption.fileId 执行出错：` + err)
         }
         if (hash) {
           url += '&hash=' + hash;
@@ -102,7 +100,10 @@ class Upload extends Emitter implements IUpload {
     super()
     this._option = Object.assign({}, { ...Upload.defaultConfig }, option);
     this._root = this.root as Element
-    this.initialize();
+    setTimeout(() => {
+      this.initialize()
+    })
+    //this.initialize();
   }
   private verifyOption(option: AUploadOption) {
     if (!option.root) {
@@ -110,6 +111,9 @@ class Upload extends Emitter implements IUpload {
     }
     const disallows = this._disallowedParams;
     const params = option.config?.data;
+    if( option.cachedFileSize && option.cachedFileSize <=-1){
+      console.warn(`您取消了浏览器离线缓存限制(500MB)，小心浏览器被挤爆`)
+    }
     if (params) {
       Object.keys(params).forEach(key => {
         if (disallows.includes(key)) {
@@ -147,6 +151,7 @@ class Upload extends Emitter implements IUpload {
       }
     }
 
+    console.log('ready')
     this.dispatch(AUploadEvent.READY);
     console.log('context', (Upload as any).abc)
   }
@@ -171,30 +176,66 @@ class Upload extends Emitter implements IUpload {
       return ''
     };
     const exec = async () => {
-      let hash = '';
+      let hash = task.hash;
       let file = task.file as File;
       try {
-        hash = await fileId(file);
-        task.hash = hash;
+        if( !hash ){
+          hash = await fileId(file);
+          task.hash = hash;
+        }
       } catch (err) {
         const message = `AUploadOption.fileId 执行出错：` + err
-        this.dispatch(AUploadEvent.ERROR_APPEND, task, message)
+        console.error(message)
+        this.dispatch(new AUploadEvent(AUploadEvent.ERROR_APPEND, { task, error:err, message }))
         return;
       }
       try {
         await this.execMiddleware(task);
         this._tasks.push(task);
-        this.dispatch(AUploadEvent.APPEND, task)
-        if (auto) {
-          this._exec();
-        }
+        this._exec();
       } catch (err) {
         console.error(err)
-        this.dispatch('error', err)
+        this.dispatch(new AUploadEvent(AUploadEvent.ERROR_APPEND,{ task, error:err  }))
       }
 
     }
     exec();
+  }
+
+
+  async remove(task:UploadTask){
+    const hash = task.hash;
+    if( !hash ){
+      const error =  new Error(`移除失败，找不到hash`)
+      this.dispatch( new AUploadEvent(AUploadEvent.ERROR,{ task, error}))
+    }
+    const service = this.findService() as IAUploadServicePlugin
+    if( service ){
+      await service.remove( task );
+    }
+    const findIndex = this._tasks.findIndex(item=> item.hash == hash );
+    if( findIndex ){
+      this._tasks.splice( findIndex, 1)
+    }
+    this.dispatch( new AUploadEvent( AUploadEvent.REMOVE, { task }))
+  }
+
+  /**
+   * 暂停任务
+   * @param task 
+   */
+  async pause(task:UploadTask){
+    const service = this.findService() as IAUploadServicePlugin
+    service && service.pause( task )
+  }
+
+  /**
+   * 恢复/重试任务
+   * @param task 
+   */
+  async resume( task:UploadTask ){
+    const service = this.findService() as IAUploadServicePlugin
+    service && service.resume( task )
   }
 
   async upload(tasks?: Array<UploadTask>) {
@@ -206,8 +247,8 @@ class Upload extends Emitter implements IUpload {
     // }
     // // return;
     if (Array.isArray(tasks)) {
-      tasks.forEach(item=>{
-        this.append( item )
+      tasks.forEach(item => {
+        this.append(item)
       })
       console.log("任务池：", this.tasks)
     }
@@ -231,6 +272,14 @@ class Upload extends Emitter implements IUpload {
     //   worker.exec( workerCode )
   }
 
+
+  private findService(){
+    const services = this.plugins.filter(item => item.type == 'service')
+    if (services.length) {
+      return services[services.length-1]
+    }
+    return null;
+  }
 
   private async _exec() {
     const tasks = this.tasks;
@@ -261,6 +310,7 @@ class Upload extends Emitter implements IUpload {
             try {
               await (current && current.exec && current.exec(queue))
             } catch (err) {
+              this.dispatch('error', err)
               console.error(err)
               //current && current.exec && current.exec( queue )
             }

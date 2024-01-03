@@ -102,6 +102,10 @@ type AUploadOption = {
    * @returns 
    */
   start?:( file:File, context:IUpload  )=> Promise< UploadTask|null >
+  /**
+   * 浏览器缓存的大小，默认为500MB
+   */
+  cachedFileSize?:number
 }
 
 
@@ -110,7 +114,11 @@ type UploadX = {
 }
 interface IUpload extends Emitter{
   container:Element
-  append( task:UploadTask )
+  append( task:UploadTask, auto:boolean = false )
+  remove( task:UploadTask )
+  pause( task:UploadTask )
+  resume( task:UploadTask )
+
   async upload:( tasks?: Array<UploadTask> )=>void;
 
   middleware:IUploadMiddleware,
@@ -134,7 +142,9 @@ interface IAUploadPlugin extends IEventDispatcher {
 }
 
 interface IAUploadServicePlugin extends IAUploadPlugin{
-
+  pause( task:UploadTask ):Promise<any>
+  resume( task:UploadTask ):Promise<any>
+  remove( task:UploadTask ):Promise<any>
 }
 
 interface IndexableAUpload {
@@ -174,10 +184,10 @@ type UploadTask = {
    * 上传的文件流信息，支持File、字节流、Base64
    */
   file:File|ArrayBuffer|string,
-  /**
-   * 是不支持多选
-   */
-  multiple?:boolean
+  // /**
+  //  * 是不支持多选
+  //  */
+  // multiple?:boolean
   /**
    * 文件hash
    */
@@ -186,5 +196,20 @@ type UploadTask = {
    * 每个任务可以拥有不同的url，encoding编码方式
    */
   config?:Record<{url?:string, encoding?:string}>
-  progress?:{ loaded:number, total:number, duration:number, start?:number}
+  /**
+   * 进度信息，包括 loaded（已经加载字节),total(整个字节数),duration(加载当前切片的用时), startTimestamp(启动加载的时间缀)
+   */
+  progress?:{ 
+    /**
+     * 状态 0：未开始，1：完成，3：处理中，4：出错
+     */
+    state:number,
+    loaded:number, 
+    total:number, 
+    duration:number, 
+    start_timestamp?:number,
+    chunk_start?:number,
+    /** 切片的完成状态 */
+    chunks?:Array<number>
+  }
 }

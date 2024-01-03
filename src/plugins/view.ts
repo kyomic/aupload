@@ -20,6 +20,7 @@ export class PluginsView extends AbstractPlugins {
   private _dropper = document.createElement('div')
   private _wrapperFiles = document.createElement('div');
   private _evtHandler
+  private _evtUploadHandler
   private _evtRootHandler
 
   private _views: Array<FileItem> = []
@@ -92,11 +93,11 @@ export class PluginsView extends AbstractPlugins {
       file.parentNode?.removeChild(file)
     }
     this._fileinput = document.createElement('input')
-    if( option.multiple ){
-      this._fileinput.setAttribute('multiple','multiple')
+    if (option.multiple) {
+      this._fileinput.setAttribute('multiple', 'multiple')
     }
-    if( option.allowedMimeType ){
-      const formattedMimies = option.allowedMimeType.reduce(( prev:Array<string>, current:string)=>{
+    if (option.allowedMimeType) {
+      const formattedMimies = option.allowedMimeType.reduce((prev: Array<string>, current: string) => {
         const arr = getMime(current)
         prev = prev.concat(arr);
         return prev;
@@ -119,42 +120,26 @@ export class PluginsView extends AbstractPlugins {
       this._root.addEventListener(evt, this._evtRootHandler)
     }
 
-    this.uploader.addEventListener('error',(e:any, message)=>{
-      AUpload.Message.error(message+"")
-    })
-    this.uploader.addEventListener('progress', (e: any, task: UploadTask) => {
-      const progress = task.progress;
-      const view = this._views.find(item => {
-        return item.task.hash == task.hash;
-      })
-      if (view) {
-        view.task = task;
-      }
-    })
-    this.uploader.addEventListener('chunk_error', (e: any, task: UploadTask) => {
-      const view = this._views.find(item => {
-        return item.task.hash == task.hash;
-      })
-      if (view) {
-        view.onError(task)
-      }
-    })
 
-
-    this.uploader.addEventListener(AUploadEvent.APPEND, (e: any, task: UploadTask) => {
-      this.appendFile(task)
-    })
-    this.uploader.addEventListener(AUploadEvent.ERROR_APPEND, (e: any, task: UploadTask, error: any) => {
-      //AUpload.Message.warn(`队列中存在文件：${task.name}`, { autoClose: true })
-      AUpload.Message.error(error+'', { autoClose: true })
+    this._evtUploadHandler = this.onUploadEvent.bind(this);
+    [
+      AUploadEvent.READY,
+      AUploadEvent.APPEND,
+      AUploadEvent.REMOVE,
+      AUploadEvent.PROGRESS,
+      AUploadEvent.COMPLETE,
+      AUploadEvent.ERROR,
+      AUploadEvent.CHUNK_ERROR,
+    ].forEach(type => {
+      this.uploader.addEventListener(type, this._evtUploadHandler)
     })
   }
+
 
   private onRootEvent(evt: Event) {
     switch (evt.type) {
       case 'mouseenter':
       case 'click':
-        console.log('focus')
         this._holder.focus()
         break;
       case 'mouseleave':
@@ -165,8 +150,25 @@ export class PluginsView extends AbstractPlugins {
 
   private appendFile(file: UploadTask) {
     const view = new FileItem(file);
+    view.addEventListener('pause',(e, task)=>{
+      this.uploader.pause(task)
+    })
+    view.addEventListener('resume',(e, task)=>{
+      this.uploader.resume(task)
+    })
+    view.addEventListener('remove', (e, task) => {
+      this.uploader.remove(task)
+    })
     this._wrapperFiles.appendChild(view.root)
     this._views.push(view)
+  }
+  private removeFile(file:UploadTask){
+    const view = this._views.find(item=>{
+      return item.task && item.task.hash == file.hash;
+    })
+    if( view ){
+      view.destroy();
+    }
   }
 
   public uploadFile(files: Array<File>) {
@@ -183,6 +185,51 @@ export class PluginsView extends AbstractPlugins {
       this._view.className = 'view view-in'
     } else {
       this._view.className = 'view'
+    }
+  }
+
+  private onUploadEvent(evt: AUploadEvent) {
+    const { task, chunk, message, error } = evt.data || {}
+    switch (evt.type) {
+      case AUploadEvent.APPEND:
+        this.appendFile(task as UploadTask)
+        break;
+      case AUploadEvent.REMOVE:
+        this.removeFile(task as UploadTask)
+        break;
+      case AUploadEvent.COMPLETE:
+      case AUploadEvent.PROGRESS:
+        if (task) {
+          const progress = task.progress;
+          const view = this._views.find(item => {
+            return item.task.hash == task.hash;
+          })
+          if (view) {
+            view.task = task;
+          }
+        }
+        break;
+      case AUploadEvent.CHUNK_ERROR:
+        if (task) {
+          const view = this._views.find(item => {
+            return item.task.hash == task.hash;
+          })
+          if (view) {
+            view.onError(task)
+          }
+        }
+
+        break;
+      case AUploadEvent.ERROR_APPEND:
+        AUpload.Message.error(message + '', { autoClose: true })
+        break;
+      case AUploadEvent.ERROR:
+        if (error) {
+          AUpload.Message.error(error + "")
+        }
+
+        break;
+
     }
   }
   private onEvent(evt: Event) {
@@ -207,7 +254,6 @@ export class PluginsView extends AbstractPlugins {
       case 'drop':
         event.preventDefault(); // 阻止浏览器默认行为，如打开文件
         files = Array.from(event.dataTransfer.files) as Array<File>
-        console.log('drop files', files)
         this.uploadFile(files)
         break
       case 'paste':
@@ -218,8 +264,6 @@ export class PluginsView extends AbstractPlugins {
           if (item.kind === 'file') {
             const file = item.getAsFile();
             files.push(file);
-            // 在这里执行文件上传的逻辑，可以使用XMLHttpRequest、Fetch API等进行上传
-            // 例如，使用Fetch API：
           }
         }
         if (files.length) {

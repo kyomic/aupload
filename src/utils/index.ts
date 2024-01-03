@@ -1,3 +1,5 @@
+import { sha256 } from "./encoder";
+
 export function generateRandomString(length) {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
@@ -41,6 +43,80 @@ export type AjaxOption = {
   onUploadStart?: (event: Event) => void
   onUploadProgress?: (event: Event) => void
 }
+
+let domHeader
+export let getDomHeader = () => {
+  if (!domHeader) {
+    domHeader = document.getElementsByTagName('head')[0]
+  }
+  return domHeader
+}
+export async function loadJS(url: string) {
+  if (!getDomHeader()) {
+    throw new Error('*** loadJS Error, 请在dom ready时调用')
+  }
+  let script: any = document.createElement('script')
+  let timeoutId: any = 0
+  return new Promise((resolve, reject) => {
+    if (script.readyState) {
+      script.onreadystatechange = () => {
+        if (script.readyState == 'complete' || script.readyState == 'loaded') {
+          clearTimeout(timeoutId)
+          resolve(true)
+        }
+      }
+    } else {
+      script.onload = () => {
+        clearTimeout(timeoutId)
+        resolve(true)
+      }
+    }
+    timeoutId = setTimeout(() => {
+      reject(new Error(`*** Error:加载${url}：30秒超时`))
+    }, 30 * 1000)
+    script.onerror = err => {
+      clearTimeout(timeoutId)
+      reject(new Error(`*** Error:加载出错`))
+    }
+    script.src = url
+    script.type = 'text/javascript'
+    domHeader.appendChild(script)
+  })
+}
+
+
+
+/**
+ * 载入JSON（暂不支持JSONP）
+ * @param url
+ * @param umd 载入后window的缓存变量名
+ * @param headers 载请JSON的请求头
+ * @param timeout 默认为0(单位ms)
+ * @returns
+ */
+export async function importJSON(
+  url: string,
+  umd: string = '',
+  headers = {},
+  timeout: number = 0
+) {
+  umd = umd || '_au_' + await sha256(url)
+  if (!window[umd]) {
+    window[umd] = await ajax({
+      url, method: 'GET', headers, timeout
+    })
+  }
+  return window[umd]
+}
+
+export async function importJS(url: string, umd: string = '') {
+  if (umd && typeof window[umd] == 'object') {
+    return window[umd]
+  }
+  const module = await loadJS(url)
+  return window[umd] || module
+}
+
 /**
  * 发一个xmlhttp 请求
  * @param {AjaxOption} opt
@@ -51,7 +127,7 @@ export function ajax(opt: AjaxOption = { url: '', method: "GET", async: true, he
   if (typeof async == 'undefined') async = true;
   const xhr = new XMLHttpRequest()
   let timeoutId: any = 0
-  const execute = function ( resolve?, reject?) {
+  const execute = function (resolve?, reject?) {
     xhr.open((method || 'GET').toUpperCase(), url, async || true)
     headers = headers || {}
     try {
@@ -77,14 +153,14 @@ export function ajax(opt: AjaxOption = { url: '', method: "GET", async: true, he
           data, xhr
         })
       } else {
-        if(xhr.readyState == 4){
-          if( [301,301].includes(xhr.status)){
+        if (xhr.readyState == 4) {
+          if ([301, 301].includes(xhr.status)) {
 
-          }else{
+          } else {
             reject && reject('网络错误,代码:' + xhr.status + ',readyStatus:' + xhr.readyState)
           }
         }
-        
+
         // 不能reject，有可能是302的JSON
         //reject('网络错误,代码:' + xhr.status + ',readyStatus:' + xhr.readyState)
       }
@@ -108,7 +184,7 @@ export function ajax(opt: AjaxOption = { url: '', method: "GET", async: true, he
     }
     xhr.onerror = function (err) {
       clearTimeout(timeoutId)
-      console.log("error")
+      console.error(err)
       reject && reject(err)
     }
     xhr.send(payload)
@@ -131,9 +207,33 @@ export function ajax(opt: AjaxOption = { url: '', method: "GET", async: true, he
       console.warn(`xhr:${url} error,status:${xhr.status}`)
       return { data: '', xhr }
     }
-  }else{
-    return new Promise((resolve,reject)=>{
-      execute(resolve,reject)
+  } else {
+    return new Promise((resolve, reject) => {
+      execute(resolve, reject)
     })
   }
+}
+
+/** 防抖 */
+export function debounce(func, delay: number=1000, context:unknown = null) {
+  let timer; // 定义计时器变量
+  return function (...args) {
+    clearTimeout(timer); // 清除之前的计时器
+    timer = setTimeout(() => {
+      func.apply(context, args); // 在指定的延迟后调用函数
+    }, delay);
+  };
+}
+/** 节流  */
+export function throttle(func, limit: number = 1000, context = null) {
+  let lastTime: any = null; // 记录上一次执行的时间
+  return function (...args) {
+    const currentTime = Date.now(); // 获取当前时间
+    if (lastTime && currentTime - lastTime < limit) {
+      return; // 若两次执行的时间小于限制值，则不执行函数
+    } else {
+      func.apply(context, args); // 否则执行函数并更新上一次执行的时间
+      lastTime = currentTime;
+    }
+  };
 }

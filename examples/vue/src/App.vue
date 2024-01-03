@@ -7,6 +7,7 @@
 <script lang="ts">
 import Vue from 'vue'
 import AUpload from '../../../src/index'
+import { PluginsAliOSS } from '../../../src/index'
 
 export default Vue.extend({
   name: 'App',
@@ -15,7 +16,9 @@ export default Vue.extend({
     if( window['instance']){
       window['instance'].destroy();
     }
+    
     window['instance']= new AUpload();
+   // AUpload.Service = PluginsAliOSS
     console.log('Auplad',AUpload)
   }
 })
