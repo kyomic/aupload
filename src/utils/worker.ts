@@ -1,13 +1,20 @@
 import Emitter from "@/core/emitter";
 import { UploadTask } from "typings";
 
+export class VirsualWorker  extends Emitter{
+  public id:string
+  constructor(){
+    super()
+  }
+
+}
 export class JSWorker extends Emitter{
   private _worker:Worker | null = null;
   private _workers:Array<Worker> = []
   /**
    * 每个子线程执行的代码
    */
-  private _code:string = ''
+  private _code:any = ''
   /**
    * 即将处理的任务池
    */
@@ -17,6 +24,7 @@ export class JSWorker extends Emitter{
    */
   private _idleWorkers:Array<Worker>=[]
   private _maxThreads:number = navigator.hardwareConcurrency || 4;
+  public fetch:(opt:any)=> any
   constructor(){
     super()
   }
@@ -50,20 +58,26 @@ export class JSWorker extends Emitter{
     }
   }
 
-  exec( code:string ){
-    if( this._code && code !=this._code ){
-      console.warn(`当前执行代码发生变更，这会导致正在运行的worker 中止`)
-      this._workers.forEach(item=>{
-        item.terminate();
-      })
+  
+  exec( code:any, ...args:any[] ){
+    // 是否启动真实worker
+    const isWorker = typeof code =='string'?true:false;
+    if( typeof code == 'string'){
+      if( this._code && code !=this._code ){
+        console.warn(`当前执行代码发生变更，这会导致正在运行的worker 中止`)
+        this._workers.forEach(item=>{
+          item.terminate();
+        })
+      }
     }
     this._code = code;
     if( !this._workers.length ){
       for( let i=0;i<this._maxThreads;i++){
         const blob = new Blob([this._code], { type: 'application/javascript' });
-        let worker = new Worker( URL.createObjectURL( blob ));
+        const config = isWorker? blob: args;
+        let worker = isWorker ? new Worker( URL.createObjectURL( blob )): new VirsualWorker();
         (worker as any).id = i;
-        worker.addEventListener('message', evt=>{
+        worker.addEventListener('message', (evt:any)=>{
           const type = evt.data.type;
           const data = evt.data.data;
           const target = evt.target;

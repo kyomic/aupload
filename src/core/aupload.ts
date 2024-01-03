@@ -11,8 +11,10 @@ import { AUploadMiddleware } from '@/middleware'
 import { PluginsMessage } from '@/plugins/message';
 import { PluginsStorage } from '@/plugins/storage';
 import { AUploadEvent } from './event';
-
+import env from './env';
+const version = env.version
 class Upload extends Emitter implements IUpload {
+  static version = version;
   static defaultConfig: AUploadOption = {
     url: 'http://localhost:8081/upload',
     root: 'body',
@@ -133,7 +135,7 @@ class Upload extends Emitter implements IUpload {
       const keys = Object.keys(plugins)
       for (let i = 0; i < keys.length; i++) {
         const plugins_name = keys[i];
-        if (plugins_name == 'defaultConfig') {
+        if (['defaultConfig','version'].includes(plugins_name)) {
           continue;
         }
         const value = plugins[plugins_name];
@@ -383,6 +385,9 @@ class Upload extends Emitter implements IUpload {
   }
   set option(opt: AUploadOption) {
     throw new Error(` option is readonly`)
+  }
+  toString(){
+    return `aupload ${AUpload.version}`
   }
 }
 

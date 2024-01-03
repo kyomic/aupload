@@ -42,10 +42,15 @@ export default class FileItem extends Emitter{
             <span class='text'><i class='p'>{{percent}}%</i><i> {{speed}}/S</i></span>
           </div>
           <div class='opt'>
+            
+            {{ if state==1 }}
+            {{ else if state == 5 }}
             <button class='resume'>继续</button>
+            {{ else if state == 0 }}
+            <button class='resume'>重试</button>
+            {{ else if state == 3 }}
             <button class='pause'>暂停</button>
-            <button class='retry'>重试</button>
-            <button class='retry' disabled>重试</button>
+            {{ /if }}
             <button class='remove'>移除</button>
           </div>
         </div>
@@ -66,6 +71,7 @@ export default class FileItem extends Emitter{
       name: this._task.name,
       size: formatBytes(this._task.size),
       percent,speed,
+      state:this.task.progress?.state,
       progress_class:cls
     }
     let html = ArtTemplate.compile(tpl)( data )
@@ -73,6 +79,10 @@ export default class FileItem extends Emitter{
 
   }
 
+  clearError(){
+    this._hasError = false;
+    this.draw()
+  }
 
   onError( task:UploadTask ){
     this._hasError = true;

@@ -201,7 +201,7 @@ type UploadTask = {
    */
   progress?:{ 
     /**
-     * 状态 0：未开始，1：完成，3：处理中，4：出错
+     * 状态 0：未开始，1：完成，3：处理中，4：出错, 5:暂停
      */
     state:number,
     loaded:number, 

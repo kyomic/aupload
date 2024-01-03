@@ -163,10 +163,12 @@ export class PluginsView extends AbstractPlugins {
     this._views.push(view)
   }
   private removeFile(file:UploadTask){
-    const view = this._views.find(item=>{
+    const view = this._views.find((item,index)=>{
       return item.task && item.task.hash == file.hash;
     })
     if( view ){
+      const idx = this._views.indexOf( view )
+      this._views.splice(idx,1)
       view.destroy();
     }
   }
@@ -205,6 +207,7 @@ export class PluginsView extends AbstractPlugins {
             return item.task.hash == task.hash;
           })
           if (view) {
+            view.clearError();
             view.task = task;
           }
         }
@@ -227,7 +230,6 @@ export class PluginsView extends AbstractPlugins {
         if (error) {
           AUpload.Message.error(error + "")
         }
-
         break;
 
     }

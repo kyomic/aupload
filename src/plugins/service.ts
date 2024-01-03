@@ -1,7 +1,7 @@
 import { AUploadOption, IAUploadServicePlugin, IUpload, UploadTask } from "typings";
 import { AbstractPlugins } from ".";
 import { AjaxOption, ajax } from "@/utils";
-import { JSWorker } from "@/utils/worker";
+import { JSWorker, VirsualWorker } from "@/utils/worker";
 import { FileEncoder } from "@/utils/encoder";
 import AUpload from "..";
 import { AUploadEvent } from "@/core/event";
@@ -28,6 +28,7 @@ export class PluginsAutoService extends AbstractPlugins implements IAUploadServi
    */
   private _files: Record<string, { task: UploadTask, continuous: UploadTask, chunks: Array<UploadTask> }> = {}
 
+  private _tasks: Array<UploadTask> = []
   /**
    * 所有切片任务
    */
@@ -37,7 +38,7 @@ export class PluginsAutoService extends AbstractPlugins implements IAUploadServi
    * xhr: 一般为xmlhttp实例
    * config，为请求配置
    */
-  private _chunksXHR:Record<string,{hash:string,chunk_index:number,xhr:any, config:AjaxOption}> = {}
+  private _chunksXHR: Record<string, { hash: string, chunk_index: number, xhr: any, config: AjaxOption }> = {}
   constructor() {
     super()
     this.type = 'service'
@@ -130,12 +131,42 @@ export class PluginsAutoService extends AbstractPlugins implements IAUploadServi
 
   async pause(task: UploadTask) {
     //debugger
+    const hash = task.hash ?? ''
+    const xhr_ids = Object.keys(this._chunksXHR);
+    const xhr_id = xhr_ids.find(item => item.indexOf(hash) > -1);
+    if (xhr_id) {
+      const xhr_object = this._chunksXHR[xhr_id];
+      if (xhr_object) {
+        try {
+          xhr_object.xhr.abort();
+        } catch (err) { }
+      }
+    }
+
   }
   async resume(task: UploadTask) {
     //debugger
+    await this.resumeTask(task)
   }
   async remove(task: UploadTask) {
     //debugger
+    const index = this._tasks.findIndex(item => item.hash == task.hash);
+    await this.pause(task);
+    if (index > -1) {
+      const hash = this._tasks[index].hash ?? ''
+      try {
+        delete this._files[hash];
+      } catch (err) { }
+      const xhr_ids = Object.keys(this._chunksXHR);
+      const xhr_id = xhr_ids.find(item => item.indexOf(hash) > -1);
+      if (xhr_id) {
+        try {
+          delete xhr_ids[xhr_id]
+        } catch (err) { }
+      }
+      this._chunks = this._chunks.filter(item => item.hash != hash);
+      this._tasks.splice(index, 1)
+    }
   }
 
   /**
@@ -145,6 +176,7 @@ export class PluginsAutoService extends AbstractPlugins implements IAUploadServi
   async exec(tasks: Array<UploadTask>) {
     const option = this.uploader.option;
     let chunkTasks: Array<UploadTask> = []
+    this._tasks = this._tasks.concat(tasks);
     for (let task of tasks) {
       let hash = task.hash ?? '';
       let file = task.file as File;
@@ -167,7 +199,7 @@ export class PluginsAutoService extends AbstractPlugins implements IAUploadServi
         }
         if (continuousTask && continuousTask.chunk_index) {
           if (continuousTask.chunk_count && continuousTask.chunk_count <= continuousTask.chunk_index) {
-            
+
             console.warn(`好像传完了`, this._files)
             if (!this._files[hash]) {
               this._files[hash] = {
@@ -177,8 +209,8 @@ export class PluginsAutoService extends AbstractPlugins implements IAUploadServi
             } else {
               throw new Error(`存在同样的文件：${file.name}`)
             }
-            this.getFileProgress( task );
-            this.uploader.dispatch( new AUploadEvent(AUploadEvent.COMPLETE,{task}))
+            this.getFileProgress(task);
+            this.uploader.dispatch(new AUploadEvent(AUploadEvent.COMPLETE, { task }))
             continue;
           } else {
             if (task.file instanceof File) {
@@ -222,8 +254,7 @@ export class PluginsAutoService extends AbstractPlugins implements IAUploadServi
     this._chunks = this._chunks.concat(chunkTasks);
     console.log('文件集：', this._files)
     console.log(`找到任务：${chunkTasks.length} chunks`, chunkTasks)
-    this.resumeTask();
-
+    this.resumeTasks();
   }
 
   /**
@@ -273,7 +304,7 @@ export class PluginsAutoService extends AbstractPlugins implements IAUploadServi
       payload: payload,
       onUploadStart: (event) => {
         if (!chunk.progress) {
-          chunk.progress = { state:3, total: 0, loaded: 0, duration: 0, start_timestamp: new Date().valueOf() }
+          chunk.progress = { state: 3, total: 0, loaded: 0, duration: 0, start_timestamp: new Date().valueOf() }
         }
         this.onTaskEvent({ type: 'uploadstart' }, chunk)
       },
@@ -281,19 +312,33 @@ export class PluginsAutoService extends AbstractPlugins implements IAUploadServi
         const { loaded, total } = event;
         if (chunk.progress) {
           const progress = chunk.progress
+          if (progress.state == 0) {
+            //这个块出错了
+            progress.loaded = 0
+          } else {
+            progress.loaded = loaded
+          }
           progress.total = total;
-          progress.loaded = loaded
           if (progress.start_timestamp) {
             progress.duration = new Date().valueOf() - progress.start_timestamp;
           } else {
             progress.duration = 0
           }
-          console.log('stats=====',chunk.progress)
+          console.log('stats=====', chunk.progress?.state)
           // if( loaded >= total ){
           //   progress.state = 1
           // }
           chunk.progress = progress;
-          this.onTaskEvent({ type: 'uploadprogress' }, chunk)
+          // 当前任务是否存在一个错误
+          let hasTaskError = false;
+          const file = this._files[chunk.hash ?? '']
+          if (file && file.task && file.task.progress && file.task.progress.state == 0) {
+            hasTaskError = true;
+          }
+          if (!hasTaskError) {
+            this.onTaskEvent({ type: 'uploadprogress' }, chunk)
+          }
+
         }
       }
     }
@@ -311,27 +356,27 @@ export class PluginsAutoService extends AbstractPlugins implements IAUploadServi
       }
       const xhr_id = [chunk.hash, chunk.chunk_index].join('_')
       this._chunksXHR[xhr_id] = {
-        hash:chunk.hash??'',
-        chunk_index:chunk.chunk_index??0,
-        xhr: data? data.xhr :null,
+        hash: chunk.hash ?? '',
+        chunk_index: chunk.chunk_index ?? 0,
+        xhr: data ? data.xhr : null,
         config
       }
       //resolve(true)
       let error_test = false;
       error_test = Math.random() > 0.5
       if (chunk?.chunk_index && chunk.chunk_index > 2 && error_test) {
-        if( chunk.progress ){
-          chunk.progress.loaded =0
-          chunk.progress.state =0
+        if (chunk.progress) {
+          chunk.progress.loaded = 0
+          chunk.progress.state = 0
         }
-        this.updateTaskState( chunk.hash??'', 0)
-        console.error('chunk error')
-        console.log('chunks',this._chunks)
+        this.updateTaskState(chunk.hash ?? '', 0)
+        console.log('chunks', this._chunks)
+        this.onTaskEvent({ type: 'uploadprogress' }, chunk)
         this.onTaskEvent({
           type: 'chunk_error'
         }, chunk)
 
-        this.onTaskEvent({ type: 'uploadprogress' }, chunk)
+
         reject('网络错误。 debug')
       } else {
         resolve(true)
@@ -344,17 +389,60 @@ export class PluginsAutoService extends AbstractPlugins implements IAUploadServi
    * @param hash 
    * @param state 
    */
-  private updateTaskState( hash:string, state:number ){
+  private updateTaskState(hash: string, state: number) {
     const files = this._files[hash];
-    if( files ){
+    if (files) {
       const task = files.task;
-      if( task && task.progress ){
+      if (task && task.progress) {
         task.progress.state = state;
       }
     }
   }
 
-  private async resumeTask() {
+
+  private async resumeTask(task: UploadTask) {
+    const option = this.uploader.option
+    if (option.worker) {
+
+    } else {
+      const hash = task.hash ?? ''
+      if (hash) {
+        let chunks = this._files[hash]?.chunks as Array<UploadTask>
+        if (Array.isArray(chunks)) {
+          chunks = chunks.concat().filter(item => {
+            if (item && item.progress) {
+              if (item.progress.loaded >= item.progress.total) {
+                return false;
+              }
+            }
+            return true;
+          })
+          if (!chunks.length) {
+
+          } else {
+            for (let chunk of chunks) {
+              try {
+                if (chunk.progress) {
+                  chunk.progress.state = 3
+                }
+                await this.uploadChunk(chunk)
+              } catch (err) {
+                this.uploader.dispatch(new AUploadEvent(AUploadEvent.CHUNK_ERROR, { chunk }))
+              }
+            }
+          }
+          this.onTaskEvent({ type: 'uploadprogress' }, task)
+
+        } else {
+          console.log('没有可用的任务')
+        }
+      } else {
+        console.log(`找不到hash:`, task)
+      }
+    }
+  }
+
+  private async resumeTasks() {
     const option = this.uploader.option
     const chunkTasks = this._chunks;
     let url = PluginsAutoService.url || option.url || ''
@@ -405,11 +493,18 @@ export class PluginsAutoService extends AbstractPlugins implements IAUploadServi
       }
       this._worker.addQueue(chunkTasks);
     } else {
-      // For 循环执行
-      for (let i = 0; i < chunkTasks.length; i++) {
-        try{
-          await this.uploadChunk( chunkTasks[i])
-        }catch(err){}
+      // 并行执行暂不支持，还是串行吧
+      // this._worker = new JSWorker();
+      // this._worker.fetch = ajax;
+      // this._worker.exec({},  this );
+      //For 循环执行
+
+      for (let i = 0; i < this._tasks.length; i++) {
+        try {
+          await this.resumeTask(this._tasks[i])
+        } catch (err) {
+          console.error(err)
+        }
       }
     }
   }
@@ -420,9 +515,10 @@ export class PluginsAutoService extends AbstractPlugins implements IAUploadServi
    * @returns 
    */
   private getFileProgress(file: UploadTask, chunk?: UploadTask) {
-    let progress = file.progress || { state:0, total: 0, loaded: 0, duration: 0, start_timestamp: 0, chunks: [] }
+    let progress = file.progress || { state: 0, total: 0, loaded: 0, duration: 0, start_timestamp: 0, chunks: [] }
     let loaded = 0;
     let duration = 0
+    let needUpdate = false;
     if (file.hash) {
       const current = this._files[file.hash ?? 'unkonw']
       if (current) {
@@ -438,42 +534,54 @@ export class PluginsAutoService extends AbstractPlugins implements IAUploadServi
         }
         // 更新chunk status
         if (chunk) {
-          const isChunkLoaded = chunk.progress && chunk.progress.loaded >= chunk.progress.total;
+          const isChunkLoaded = chunk.progress && chunk.progress.loaded >= chunk.progress.total && chunk.progress.state == 1
           if (isChunkLoaded) {
-            if (!progress.chunks || progress.chunks.length != chunk.chunk_count) {
-              progress.chunks = Array.from({ length: chunk.chunk_count ?? 1 }).map((item, idx) => {
-                if (continuousIndex >= -1 && continuousIndex >= idx) {
-                  return -1
-                }
-                return 0;
-              })
+            if (chunk.chunk_count) {
+              if (!progress.chunks || progress.chunks.length != chunk.chunk_count) {
+                progress.chunks = Array.from({ length: chunk.chunk_count ?? 1 }).map((item, idx) => {
+                  if (continuousIndex >= -1 && continuousIndex >= idx) {
+                    return -1
+                  }
+                  return 0;
+                })
+                progress.chunks[chunk.chunk_index ?? 0] = 1;
+              }
             }
-            progress.chunks[chunk.chunk_index ?? 0] = 1;
+
           }
         }
         if (!progress.start_timestamp) {
           progress.start_timestamp = new Date().valueOf()
         }
         const reference: File = current.task.file as File;
-        let loads:any = []
+        let loads: any = []
         current.chunks.forEach(item => {
           duration += Number(item.progress?.duration ?? 0)
           loaded += Number(item.progress?.loaded ?? 0)
           loads.push(item.progress?.loaded ?? 0)
         })
-        
-        if( !current.chunks.length ){
+
+        if (!current.chunks.length) {
           // TODO
           // 不存在切片.
 
         }
-        console.log('~~~~ loads',loads, current)
-        progress.duration = new Date().valueOf() - (progress?.start_timestamp ?? 0)
-        if (progress.duration <= 0) {
-          progress.duration = duration
-        }
-        progress.loaded = loaded
+        progress.state = current.chunks.find(item => {
+          if (item.progress) {
+            return item.progress.state == 0
+          }
+          return false;
+        }) ? 0 : 3
+        console.log('~~~~ loads', loads, progress)
 
+        if (loaded >= progress.loaded) {
+          // 避免出现 progress事件在error事件前执行产线进度回推现象
+          progress.loaded = loaded
+          progress.duration = new Date().valueOf() - (progress?.start_timestamp ?? 0)
+          if (progress.duration <= 0) {
+            progress.duration = duration
+          }
+        }
         if (reference) { progress.total = reference.size }
         /**
          * 因为payload多传了一堆非流的参数，loaded有可能大于total
@@ -481,7 +589,7 @@ export class PluginsAutoService extends AbstractPlugins implements IAUploadServi
         if (progress.loaded >= progress.total) {
           progress.loaded = progress.total;
         }
-        if( progress.loaded>= progress.total) progress.state = 1
+        if (progress.loaded >= progress.total) progress.state = 1
         file.progress = progress
       }
     }
@@ -491,7 +599,7 @@ export class PluginsAutoService extends AbstractPlugins implements IAUploadServi
   private onTaskEvent(e, chunk: UploadTask) {
     const hash = chunk.hash ?? ''
     if (hash) {
-      console.log('task', this._files[hash], hash)
+      console.log('ontask event:', e.type, this._files[hash], hash)
       if (this._files[hash]) {
         const task = this._files[hash].task
         switch (e.type) {
@@ -499,9 +607,16 @@ export class PluginsAutoService extends AbstractPlugins implements IAUploadServi
             break;
           case 'uploadprogress':
             task.progress = this.getFileProgress(task, chunk)
+            if (task.progress.state == 0) {
+              return
+            }
             this.uploader.dispatch(new AUploadEvent(AUploadEvent.PROGRESS, { task, chunk }))
+            if (task.progress.loaded >= task.progress.total && task.progress.loaded) {
+              this.uploader.dispatch(new AUploadEvent(AUploadEvent.COMPLETE, { task, chunk }))
+            }
             break;
           case 'chunk_error':
+            console.error('chunk_error')
             this.uploader.dispatch(new AUploadEvent(AUploadEvent.CHUNK_ERROR, { task, chunk }))
             break
         }
