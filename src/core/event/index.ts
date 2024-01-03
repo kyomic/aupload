@@ -1,4 +1,4 @@
-import { UploadTask } from "typings"
+import { UploadTask } from "aupload"
 
 
 

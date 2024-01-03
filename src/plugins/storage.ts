@@ -1,5 +1,5 @@
+import { IAUploadPlugin, IUpload, UploadTask } from "aupload";
 import { debounce } from "@/utils";
-import { IAUploadPlugin, IUpload, UploadTask } from "../../typings";
 import { AbstractPlugins } from './index'
 import { AUploadEvent } from "@/core/event";
 import { localStore } from "@/utils/storage";

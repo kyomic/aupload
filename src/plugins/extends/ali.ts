@@ -1,4 +1,4 @@
-import { AUploadOption, IUpload, UploadTask } from "typings";
+import { AUploadOption, IUpload, UploadTask } from "aupload";
 import { AjaxOption, ajax, importJS, loadJS } from "@/utils";
 import { JSWorker } from "@/utils/worker";
 import { FileEncoder } from "@/utils/encoder";

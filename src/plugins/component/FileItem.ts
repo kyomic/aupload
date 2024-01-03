@@ -1,7 +1,7 @@
 import Emitter from "@/core/emitter"
 import { ArtTemplateRender,ArtTemplate } from "@/utils/artTemplate"
 import { formatBytes } from "@/utils/index"
-import { UploadTask } from "typings"
+import { UploadTask } from "aupload"
 
 
 export default class FileItem extends Emitter{

@@ -1,4 +1,4 @@
-import { AUploadOption, IAUploadServicePlugin, IUpload, UploadTask } from "typings";
+import { AUploadOption, IAUploadServicePlugin, IUpload, UploadTask } from "aupload";
 import { AbstractPlugins } from ".";
 import { AjaxOption, ajax } from "@/utils";
 import { JSWorker, VirsualWorker } from "@/utils/worker";

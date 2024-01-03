@@ -1,4 +1,4 @@
-import { IEventDispatcher, TypedEvent } from "../../typings"
+import { IEventDispatcher, TypedEvent } from "aupload"
 
 
 class Emitter implements IEventDispatcher {
