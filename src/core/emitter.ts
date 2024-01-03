@@ -1,9 +1,6 @@
-import { IEventDispatcher } from "../../typings"
+import { IEventDispatcher, TypedEvent } from "../../typings"
 
-type TypedEvent = {
-  type: string,
-  [attr: string]: any
-}
+
 class Emitter implements IEventDispatcher {
   protected _events = {}
   protected _once_events = {}

@@ -1,4 +1,4 @@
-import { IAUploadPlugin, IUpload, UploadTask } from "../../typings";
+import { IAUploadPlugin, IUpload, UploadTask } from "aupload";
 import { AbstractPlugins } from './index'
 import { AUpload } from '../index'
 import { Query } from "@/utils/query";

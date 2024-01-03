@@ -1,5 +1,5 @@
 import Emitter from "@/core/emitter";
-import { IAUploadPlugin, IUpload } from "../../typings";
+import { IAUploadPlugin, IUpload } from "aupload";
 import { AUpload } from '../index'
 export class AbstractPlugins extends Emitter implements IAUploadPlugin {
   protected uploader:IUpload;

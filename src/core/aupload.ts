@@ -1,5 +1,5 @@
 
-import { AUploadOption, IAUploadPlugin, IAUploadServicePlugin, IUpload, IndexableAUpload, UploadTask } from '../../typings';
+import { AUploadOption, IAUploadPlugin, IAUploadServicePlugin, IUpload, UploadTask ,IndexableAUpload } from 'aupload';
 import Emitter from './emitter'
 import { PluginsView } from '../plugins/view';
 import { PluginManager } from '../plugins';
@@ -90,9 +90,7 @@ class Upload extends Emitter implements IUpload {
   private _root: Element
   private _container: Element = document.createElement('div')
   private _id: string = generateRandomString(10)
-
   private _tasks: Array<UploadTask> = []
-
   private _plugins: Array<IAUploadPlugin> = []
   /**
    * 中件间
@@ -152,10 +150,7 @@ class Upload extends Emitter implements IUpload {
         }
       }
     }
-
-    console.log('ready')
     this.dispatch(AUploadEvent.READY);
-    console.log('context', (Upload as any).abc)
   }
 
   execMiddleware(task: UploadTask): Promise<any> {
@@ -241,13 +236,6 @@ class Upload extends Emitter implements IUpload {
   }
 
   async upload(tasks?: Array<UploadTask>) {
-    // const task = tasks?.pop();
-    // if( task ){
-    //   const encoder = new FileEncoder()
-    //   let a = await encoder.fileSha256(task.file as File, 1*1024*1024)
-    //   console.log('hash',a)
-    // }
-    // // return;
     if (Array.isArray(tasks)) {
       tasks.forEach(item => {
         this.append(item)
@@ -255,23 +243,6 @@ class Upload extends Emitter implements IUpload {
       console.log("任务池：", this.tasks)
     }
     this._exec();
-
-    //   const workerCode = `
-    //   self.addEventListener('message', function (event) {
-    //     const { url, fileName } = event.data;
-    //     setTimeout(()=>{
-    //       self.postMessage({ status: 'success', blob, fileName });
-    //     },1000)
-    //   });
-    //   self.postMessage({type:'init'})
-    // `;
-    //   let worker = new JSWorker()
-    //   worker.on('message',(evt)=>{
-    //     const type = evt.data.type;
-    //     const data = evt.data.data;
-    //     console.log('主进程收到消息',evt)
-    //   })
-    //   worker.exec( workerCode )
   }
 
 
@@ -290,7 +261,6 @@ class Upload extends Emitter implements IUpload {
     if (services.length) {
       /** 选自动找一个最新的 */
       const current = services[services.length - 1]
-
       const queue: Array<UploadTask> = [];
       while (this.tasks.length) {
         const task = this.tasks.shift();
@@ -345,6 +315,7 @@ class Upload extends Emitter implements IUpload {
         plugins.destroy();
       } catch (err) { }
     })
+    this._plugins = [];
     try {
       this._container.parentNode?.removeChild(this._container)
     } catch (err) { }

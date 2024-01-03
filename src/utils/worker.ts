@@ -1,5 +1,5 @@
 import Emitter from "@/core/emitter";
-import { UploadTask } from "typings";
+import { UploadTask } from "aupload";
 
 export class VirsualWorker  extends Emitter{
   public id:string

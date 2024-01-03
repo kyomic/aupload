@@ -10,7 +10,7 @@
     "server": "node build/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "typings": "typings/index.d.ts",
+  "types": "typings/index.d.ts",
   "keywords": [],
   "author": "",
   "license": "ISC",

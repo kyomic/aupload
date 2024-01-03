@@ -33,7 +33,7 @@ export class AUploadEvent extends AbstractEvent{
   private _data:{ task?:UploadTask, chunk?:UploadTask, error?:any, message?:string } = {}
   constructor( type:string,  data:{ task?:UploadTask, chunk?:UploadTask, error?:any, message?:string }){
     super(type)
-    this._data = data;
+    this._data = data || {}
   }
 
   get data(){
