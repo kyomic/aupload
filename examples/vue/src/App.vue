@@ -6,21 +6,22 @@
 
 <script lang="ts">
 import Vue from 'vue'
-import AUpload from '../../../src/index'
+//import AUpload from '../../../src/index'
+import { AUpload } from 'aupload'
 import { PluginsAliOSS } from '../../../src/index'
 
 export default Vue.extend({
   name: 'App',
   components: {},
-  mounted(){
-    if( window['instance']){
-      window['instance'].destroy();
+  mounted() {
+    if (window['instance']) {
+      window['instance'].destroy()
     }
-    
-    window['instance']= new AUpload();
-   // AUpload.Service = PluginsAliOSS
-    console.log('Auplad',AUpload)
-  }
+
+    window['instance'] = new AUpload()
+    // AUpload.Service = PluginsAliOSS
+    console.log('Auplad', AUpload)
+  },
 })
 </script>
 

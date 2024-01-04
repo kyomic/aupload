@@ -19,14 +19,19 @@
 
     "typeRoots": [
       "./node_modules/@types/",
-      "./src/typings"
+      "./src/typings",
+      "./typings"
     ],
     "types": [
       "webpack-env",
       //"jest",
-      "resize-observer-browser"
+      "resize-observer-browser",
+      "vite/client"
     ],
     "paths": {
+      "@types/aupload": [
+        "./typings*/"
+      ],
       "@/*": [
         "./src/*"
       ]

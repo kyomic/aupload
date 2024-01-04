@@ -1,23 +1,17 @@
 {
   "name": "aupload",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "1.0.1",
+  "description": "aaa",
+  "main": "lib/index.umd.js",
+  "module": "lib/index.mjs",
   "scripts": {
     "bootstrap": "npm i --register=https://registry.npm.taobao.org/",
     "dev": "node build/start.js --framework=vue",
     "server": "node build/server.js",
-    "build:lib": "vite build --mode=library",
+    "build:lib": "cross-env NODE_ENV=production && node build/inject_version.js && vite build --mode=production",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "files": [
-    "lib/**/*",
-    "dist/",
-    "examples/",
-    "public/",
-    "typings/",
-    "!test/"
-  ],
+  "files": ["lib/**/*", "dist/", "examples/", "public/", "typings/", "!test/"],
   "types": "typings/index.d.ts",
   "keywords": [],
   "author": "",

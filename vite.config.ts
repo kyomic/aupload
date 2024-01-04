@@ -1,5 +1,6 @@
 import { UserConfigExport, defineConfig, loadEnv } from 'vite'
 import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js'
+//import viteCompression from 'vite-plugin-compression'
 
 import path, { resolve } from 'path'
 // npm i fast-glob
@@ -36,7 +37,7 @@ const generateConfig = ({ command, mode, ssrBuild }) => {
   const env = loadEnv(mode, process.cwd(), '')
   console.log('mode', mode)
   console.log('command', command)
-  if (mode == 'library') {
+  if (mode == 'production') {
     return {
       ...defaultConfig,
       plugins: [...defaultConfig.plugins],
