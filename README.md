@@ -13,6 +13,8 @@
 
 5.插件式架构，支持各种云（目前仅开发了PluginsAliOSS, ...）
 
+# 示例：
+![Image text](https://kyomic.github.io/aupload/examples/assets/example.png)
 
 # 使用说明
 
