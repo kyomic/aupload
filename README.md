@@ -8,7 +8,7 @@
 
 2.多样的文件上处理，如：切片、秒传、多线程、离线上传
 
-3.自定义文件编码，如：multipart/form-data,Base64,Binray
+3.自定义文件编码，如：multipart/form-data,base64,binary
 
 4.原生JS开发、兼容Vue、React等多种主流框架（不入流的IE9除外)
 
