@@ -10,6 +10,14 @@
     "build:lib": "vite build --mode=library",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "files": [
+    "lib/**/*",
+    "dist/",
+    "examples/",
+    "public/",
+    "typings/",
+    "!test/"
+  ],
   "types": "typings/index.d.ts",
   "keywords": [],
   "author": "",
